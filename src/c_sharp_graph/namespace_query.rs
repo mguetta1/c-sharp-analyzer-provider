@@ -1,7 +1,7 @@
 use core::fmt;
 use std::vec;
 
-use anyhow::{anyhow, Error, Ok};
+use anyhow::{Error, Ok};
 use stack_graphs::{
     arena::Handle,
     graph::{Node, StackGraph},
@@ -49,6 +49,7 @@ pub(crate) struct NamespaceSymbols {
     fields: Option<FieldSymbols>,
     methods: Option<MethodSymbols>,
     namespace: Vec<Fqdn>,
+    search: Search,
 }
 
 // Create exposed methods for NamespaceSymbols
@@ -68,33 +69,39 @@ impl NamespaceSymbols {
             Self::traverse_node(graph, node, search, &mut results);
         }
 
-        if results.is_empty()
-            && class_symbol.is_err()
-            && field_symbol.is_err()
-            && method_symbols.is_err()
-        {
-            info!("no searchable nodes found");
-            return Err(anyhow!(NotFoundError {}));
-        }
+        // Note: We don't fail when no definitions are found. This allows querying
+        // for external namespaces (like System.Web.Mvc) that are imported but not
+        // declared in the user's code. At minimum, we can still find import statements.
         let class_symbol = class_symbol.ok();
         let method_symbols = method_symbols.ok();
         let field_symbol = field_symbol.ok();
-        info!(
-            "searchable nodes found: \nclasses: {:?}\nmethods: {:?}\nfields: {:?}\nnamespaces: {:?}",
-            class_symbol, method_symbols, field_symbol, results
-        );
+
+        if results.is_empty()
+            && class_symbol.is_none()
+            && field_symbol.is_none()
+            && method_symbols.is_none()
+        {
+            info!("no namespace declarations found, but will still search for imports and references");
+        } else {
+            info!(
+                "searchable nodes found: \nclasses: {:?}\nmethods: {:?}\nfields: {:?}\nnamespaces: {:?}",
+                class_symbol, method_symbols, field_symbol, results
+            );
+        }
 
         Ok(NamespaceSymbols {
             classes: class_symbol,
             fields: field_symbol,
             methods: method_symbols,
             namespace: results,
+            search: (*search).clone(),
         })
     }
 }
 
 impl SymbolMatcher for NamespaceSymbols {
     fn match_symbol(&self, symbol: &str) -> bool {
+        // Check namespace declarations
         if self
             .namespace
             .iter()
@@ -103,21 +110,38 @@ impl SymbolMatcher for NamespaceSymbols {
             trace!("matched namespace symbol: {:?}", symbol);
             return true;
         }
+        // Check classes
         if let Some(classes) = &self.classes {
             if classes.match_symbol(symbol) {
                 return true;
             }
         }
+        // Check methods
         if let Some(methods) = &self.methods {
             if methods.match_symbol(symbol) {
                 return true;
             }
         }
+        // Check fields
         if let Some(fields) = &self.fields {
             if fields.match_symbol(symbol) {
                 return true;
             }
         }
+
+        // Fallback: when there are no declarations (external namespaces like System.Web.Mvc),
+        // check if the symbol matches the search pattern directly (for imports)
+        if self.namespace.is_empty()
+            && self.classes.is_none()
+            && self.fields.is_none()
+            && self.methods.is_none()
+        {
+            if self.search.match_namespace(&symbol) {
+                trace!("matched symbol via search pattern: {:?}", symbol);
+                return true;
+            }
+        }
+
         false
     }
 

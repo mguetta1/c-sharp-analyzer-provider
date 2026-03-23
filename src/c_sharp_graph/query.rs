@@ -963,12 +963,13 @@ pub(crate) trait SymbolMatcher {
 }
 
 #[derive(Debug)]
+#[derive(Clone)]
 struct SearchPart {
     part: String,
     regex: Option<Regex>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Search {
     parts: Vec<SearchPart>,
 }
