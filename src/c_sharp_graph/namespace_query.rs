@@ -453,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn test_namespace_symbols_error_when_no_namespace_found() {
+    fn test_namespace_symbols_ok_when_no_namespace_found() {
         let mut graph = StackGraph::new();
         let file = graph.add_file("test.cs").unwrap();
 
@@ -467,8 +467,11 @@ mod tests {
         let search = Search::create_search("*".to_string()).unwrap();
         let result = NamespaceSymbols::new(&graph, vec![root], &search);
 
-        // Should return error when no namespace is found
-        assert!(result.is_err());
+        // Should return Ok even when no namespace declarations are found
+        // This allows querying for external namespaces that are imported but not declared
+        assert!(result.is_ok());
+        let ns_symbols = result.unwrap();
+        assert!(ns_symbols.namespace.is_empty());
     }
 
     #[test]

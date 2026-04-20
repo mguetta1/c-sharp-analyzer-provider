@@ -46,6 +46,33 @@
       - url: https://learn.microsoft.com/en-us/ef/efcore-and-ef6/porting/
         title: Porting from EF6 to EF Core
       effort: 7
+    dotnet-core-ef-dbset-01:
+      description: Review DbSet usage for EF Core compatibility
+      category: optional
+      labels:
+      - konveyor.io/source=dotnet
+      - konveyor.io/target=dotnet-core
+      incidents:
+      - uri: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Models/AccountModels.cs
+        message: |
+          DbSet is available in EF Core but some behaviors have changed.
+
+          Review actions:
+          - DbSet API is largely compatible but review LINQ query behavior
+          - Some LINQ operators may require client evaluation in EF Core 2.x (throws exception in 3.0+)
+          - Check for use of unsupported query patterns
+          - Add .AsNoTracking() where appropriate for better performance
+          - Review any custom DbSet implementations
+        codeSnip: "7 \n8 namespace NerdDinner.Models\n9 {\n10     public class UsersContext : DbContext\n11     {\n12         public UsersContext()\n13             : base(\"DefaultConnection\")\n14         {\n15         }\n16 \n"
+        lineNumber: 17
+        variables:
+          file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Models/AccountModels.cs
+          symbol: DbSet
+          syntax_type: name
+      links:
+      - url: https://learn.microsoft.com/en-us/ef/core/querying/
+        title: DbSet in EF Core
+      effort: 3
     dotnet-core-ef-lazy-loading-01:
       description: Review Entity Framework lazy loading configuration
       category: optional
@@ -664,6 +691,92 @@
       - url: https://learn.microsoft.com/en-us/aspnet/core/security/authentication/social/google-logins
         title: Google external login setup
       effort: 8
+    dotnet-core-optimization-01:
+      description: System.Web.Optimization bundling is not available in .NET Core
+      category: mandatory
+      labels:
+      - konveyor.io/source=dotnet
+      - konveyor.io/target=dotnet-core
+      incidents:
+      - uri: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/App_Start/BundleConfig.cs
+        message: |
+          System.Web.Optimization is not available in .NET Core.
+          Bundling and minification are handled differently in ASP.NET Core.
+
+          Migration actions:
+          - Remove BundleConfig.cs
+          - Use BuildBundlerMinifier NuGet package, or
+          - Use Webpack, Gulp, or other build-time bundlers, or
+          - Use ASP.NET Core bundling libraries like WebOptimizer
+          - Update views to reference individual files or new bundle definitions
+        codeSnip: "0 \uFEFFusing System.Web;\n1 using System.Web.Optimization;\n2 \n3 namespace NerdDinner\n4 {\n5     public class BundleConfig\n6     {\n7         // For more information on Bundling, visit http://go.microsoft.com/fwlink/?LinkId=254725\n8         public static void RegisterBundles(BundleCollection bundles)\n9         {\n"
+        lineNumber: 1
+        variables:
+          file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/App_Start/BundleConfig.cs
+          symbol: System.Web.Optimization
+          syntax_type: import
+      - uri: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Global.asax.cs
+        message: |
+          System.Web.Optimization is not available in .NET Core.
+          Bundling and minification are handled differently in ASP.NET Core.
+
+          Migration actions:
+          - Remove BundleConfig.cs
+          - Use BuildBundlerMinifier NuGet package, or
+          - Use Webpack, Gulp, or other build-time bundlers, or
+          - Use ASP.NET Core bundling libraries like WebOptimizer
+          - Update views to reference individual files or new bundle definitions
+        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Reflection;\n4 using System.Web;\n5 using System.Web.Http;\n6 using System.Web.Mvc;\n7 using System.Web.Optimization;\n8 using System.Web.Routing;\n9 \n"
+        lineNumber: 7
+        variables:
+          file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Global.asax.cs
+          symbol: System.Web.Optimization
+          syntax_type: import
+      links:
+      - url: https://learn.microsoft.com/en-us/aspnet/core/client-side/bundling-and-minification
+        title: Bundle and minify static assets in ASP.NET Core
+      effort: 5
+    dotnet-core-routing-01:
+      description: System.Web.Routing is replaced by ASP.NET Core routing
+      category: mandatory
+      labels:
+      - konveyor.io/source=dotnet
+      - konveyor.io/target=dotnet-core
+      incidents:
+      - uri: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/App_Start/RouteConfig.cs
+        message: |
+          System.Web.Routing is not available in .NET Core and is replaced by ASP.NET Core routing.
+
+          Migration actions:
+          - Move route registration from RouteConfig.RegisterRoutes to Startup.Configure
+          - Use app.UseRouting() and app.UseEndpoints() in the middleware pipeline
+          - Consider using endpoint routing with MapControllerRoute
+          - Update any custom route constraints
+        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Web;\n4 using System.Web.Mvc;\n5 using System.Web.Routing;\n6 \n7 namespace NerdDinner\n8 {\n9     public class RouteConfig\n"
+        lineNumber: 5
+        variables:
+          file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/App_Start/RouteConfig.cs
+          symbol: System.Web.Routing
+          syntax_type: import
+      - uri: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Global.asax.cs
+        message: |
+          System.Web.Routing is not available in .NET Core and is replaced by ASP.NET Core routing.
+
+          Migration actions:
+          - Move route registration from RouteConfig.RegisterRoutes to Startup.Configure
+          - Use app.UseRouting() and app.UseEndpoints() in the middleware pipeline
+          - Consider using endpoint routing with MapControllerRoute
+          - Update any custom route constraints
+        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Reflection;\n4 using System.Web;\n5 using System.Web.Http;\n6 using System.Web.Mvc;\n7 using System.Web.Optimization;\n8 using System.Web.Routing;\n9 \n"
+        lineNumber: 8
+        variables:
+          file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Global.asax.cs
+          symbol: System.Web.Routing
+          syntax_type: import
+      links:
+      - url: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/routing
+        title: Routing in ASP.NET Core
+      effort: 5
     dotnet-core-websecurity-01:
       description: WebMatrix.WebData.WebSecurity is not available in .NET Core
       category: mandatory
@@ -2098,7 +2211,6 @@
   - dotnet-core-configmanager-01
   - dotnet-core-connectionstrings-01
   - dotnet-core-dotnetopenauth-01
-  - dotnet-core-ef-dbset-01
   - dotnet-core-ef-initializer-01
   - dotnet-core-ef-spatial-01
   - dotnet-core-forms-auth-01
@@ -2112,11 +2224,9 @@
   - dotnet-core-membership-01
   - dotnet-core-modelbinder-01
   - dotnet-core-multimodule-assembly-01
-  - dotnet-core-optimization-01
   - dotnet-core-reflection-only-01
   - dotnet-core-remoting-01
   - dotnet-core-routetable-01
-  - dotnet-core-routing-01
   - dotnet-core-server-mappath-01
   - dotnet-core-session-01
   - dotnet-core-system-drawing-01
