@@ -962,8 +962,7 @@ pub(crate) trait SymbolMatcher {
     fn match_fqdn(&self, fqdn: &Fqdn) -> bool;
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct SearchPart {
     part: String,
     regex: Option<Regex>,
