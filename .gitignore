@@ -1,17 +1,26 @@
 /target
-#output.yaml
-#e2e-tests/analysis-output.yaml
-#e2e-tests/konveyor-analyzer
-#e2e-tests/konveyor-analyzer.exe
-#test-*.db
-#jquery-1.7.1-vsdoc.js
-#*paket*
-#obj/*
 
+# C# build artifacts
+[Oo]bj/
+[Bb]in/
 
+# NuGet
+*.nupkg
+project.assets.json
+project.nuget.cache
+*.nuget.g.props
+*.nuget.g.targets
+*.nuget.dgspec.json
 
-# Added by cargo
-#
-# already existing elements were commented out
+# Paket
+paket-files/
+.paket/
+*.paket.props
+*.paket.references.cached
+*.paket.resolved
+paket.lock
 
-#/target
+# Test artifacts
+test-*.db
+test-server-*.log
+testing.db
