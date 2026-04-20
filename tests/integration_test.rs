@@ -468,3 +468,156 @@ async fn integration_test_net8() {
     }
     println!(".NET 8 integration test completed successfully");
 }
+
+/// Test that queries for external namespaces find import statements.
+/// This tests the csharp-sample project which uses System.Web.Mvc - an external NuGet package.
+#[tokio::test]
+async fn integration_test_csharp_sample() {
+    let port = "9002";
+    // Clean up old database to ensure fresh start
+    let _ = std::fs::remove_file(format!("test-{}.db", port));
+    // Start the server (will be automatically killed on drop)
+    let _server_guard = start_server(port);
+
+    // Wait for server to be ready
+    if let Err(e) = wait_for_server(port, 60).await {
+        panic!("Failed to start server: {}", e);
+    }
+
+    // Connect to the server
+    let mut client =
+        match ProviderServiceClient::connect(format!("{}:{}", "http://localhost", port)).await {
+            Ok(client) => client,
+            Err(e) => {
+                panic!(
+                    "Failed to connect to server: {} -- http://localhost:{}",
+                    e, port
+                );
+            }
+        };
+
+    let current_file = file!();
+    let file_path = absolute(PathBuf::from_str(current_file).unwrap()).unwrap();
+    let parent = file_path.parent().unwrap();
+    let base = parent.parent().unwrap();
+
+    // Initialize the provider with csharp-sample (project with System.Web.Mvc references)
+    let testdata_location = PathBuf::from(&base).join("testdata").join("csharp-sample");
+    println!(
+        "Initializing provider with csharp-sample project: {:?}",
+        testdata_location
+    );
+
+    // Build provider-specific config
+    let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+    let dotnet_install_script = PathBuf::from(&base)
+        .join("scripts")
+        .join("dotnet-install.sh");
+    let mut provider_config_fields = std::collections::BTreeMap::new();
+    provider_config_fields.insert(
+        "ilspy_cmd".to_string(),
+        Value {
+            kind: Some(StringValue(format!("{}/.dotnet/tools/ilspycmd", home_dir))),
+        },
+    );
+    provider_config_fields.insert(
+        "paket_cmd".to_string(),
+        Value {
+            kind: Some(StringValue(format!("{}/.dotnet/tools/paket", home_dir))),
+        },
+    );
+    provider_config_fields.insert(
+        "dotnet_install_cmd".to_string(),
+        Value {
+            kind: Some(StringValue(
+                dotnet_install_script.to_string_lossy().to_string(),
+            )),
+        },
+    );
+
+    let config = Config {
+        location: testdata_location.to_string_lossy().to_string(),
+        dependency_path: String::new(),
+        analysis_mode: "source-only".to_string(),
+        provider_specific_config: Some(Struct {
+            fields: provider_config_fields,
+        }),
+        proxy: None,
+        language_server_pipe: String::new(),
+        initialized: false,
+    };
+
+    // Call init
+    match client.init(config).await {
+        Ok(response) => {
+            let init_response = response.into_inner();
+            if !init_response.successful {
+                panic!("Init failed: {}", init_response.error);
+            }
+            println!("Successfully initialized csharp-sample provider");
+        }
+        Err(e) => {
+            panic!("Init request failed: {}", e);
+        }
+    }
+
+    // Test: Query for System.Web.Mvc.* - should find the import statement
+    // even when the namespace is not declared in user code or the SDK
+    let request = EvaluateRequest {
+        id: 1,
+        cap: "referenced".to_string(),
+        condition_info: r#"{"referenced": {"pattern": "System.Web.Mvc.*"}}"#.to_string(),
+    };
+
+    println!("Running query for System.Web.Mvc.* (external namespace import)...");
+    let result = client.evaluate(request).await.unwrap().into_inner();
+
+    assert!(
+        result.successful,
+        "expected successful result got: {:?}",
+        result
+    );
+
+    match result.response {
+        None => panic!("No response from evaluate"),
+        Some(response) => {
+            println!(
+                "Found {} System.Web.Mvc incidents",
+                response.incident_contexts.len()
+            );
+
+            assert!(
+                !response.incident_contexts.is_empty(),
+                "Expected at least 1 incident for System.Web.Mvc import statement"
+            );
+
+            // Verify the import statement is found in Program.cs
+            let import_incidents: Vec<_> = response
+                .incident_contexts
+                .iter()
+                .filter(|ic| ic.file_uri.contains("Program.cs"))
+                .collect();
+
+            assert!(
+                !import_incidents.is_empty(),
+                "Expected to find System.Web.Mvc import in Program.cs"
+            );
+
+            // Verify the line number is correct
+            let first_incident = import_incidents.first().unwrap();
+            assert_eq!(
+                first_incident.line_number,
+                Some(2),
+                "Expected System.Web.Mvc import at line 2 (0-indexed), got {:?}",
+                first_incident.line_number
+            );
+
+            println!(
+                "Successfully found System.Web.Mvc import at line {} (0-indexed)",
+                first_incident.line_number.unwrap()
+            );
+        }
+    }
+
+    println!("csharp-sample external namespace test completed successfully");
+}
