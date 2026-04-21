@@ -114,13 +114,19 @@ async fn wait_for_server(port: &str, max_attempts: u32) -> Result<(), String> {
     Err("Server failed to start".to_string())
 }
 
-#[tokio::test]
-async fn integration_tests() {
-    let port = "9000";
+/// Helper struct containing initialized test resources
+struct TestSetup {
+    client: ProviderServiceClient<tonic::transport::Channel>,
+    base_path: String,
+    _server_guard: ServerGuard,
+}
+
+/// Sets up a test server, connects a client, and initializes the provider
+async fn setup_test(port: &str, testdata_subpath: &str) -> TestSetup {
     // Clean up old database to ensure fresh start
     let _ = std::fs::remove_file(format!("test-{}.db", port));
     // Start the server (will be automatically killed on drop)
-    let _server_guard = start_server(port);
+    let server_guard = start_server(port);
 
     // Wait for server to be ready
     if let Err(e) = wait_for_server(port, 60).await {
@@ -132,18 +138,21 @@ async fn integration_tests() {
         match ProviderServiceClient::connect(format!("{}:{}", "http://localhost", port)).await {
             Ok(client) => client,
             Err(e) => {
-                panic!("Failed to connect to server: {}", e);
+                panic!(
+                    "Failed to connect to server: {} -- http://localhost:{}",
+                    e, port
+                );
             }
         };
+
     let current_file = file!();
     let file_path = absolute(PathBuf::from_str(current_file).unwrap()).unwrap();
-
     let parent = file_path.parent().unwrap();
     let base = parent.parent().unwrap();
-    let base: String = base.to_string_lossy().into_owned();
+    let base_path: String = base.to_string_lossy().into_owned();
 
-    // Initialize the provider with testdata/nerd-dinner
-    let testdata_location = PathBuf::from(&base).join("testdata").join("nerd-dinner");
+    // Initialize the provider with the specified testdata subdirectory
+    let testdata_location = PathBuf::from(&base_path).join("testdata").join(testdata_subpath);
     println!(
         "Initializing provider with location: {:?}",
         testdata_location
@@ -151,7 +160,7 @@ async fn integration_tests() {
 
     // Build provider-specific config
     let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
-    let dotnet_install_script = PathBuf::from(&base)
+    let dotnet_install_script = PathBuf::from(&base_path)
         .join("scripts")
         .join("dotnet-install.sh");
     let mut provider_config_fields = std::collections::BTreeMap::new();
@@ -202,6 +211,24 @@ async fn integration_tests() {
         }
     }
 
+    TestSetup {
+        client,
+        base_path,
+        _server_guard: server_guard,
+    }
+}
+
+#[tokio::test]
+async fn integration_tests() {
+    let TestSetup {
+        mut client,
+        base_path: base,
+        _server_guard,
+    } = setup_test("9000", "nerd-dinner").await;
+
+    let current_file = file!();
+    let file_path = absolute(PathBuf::from_str(current_file).unwrap()).unwrap();
+    let parent = file_path.parent().unwrap();
     let demos_path = parent.to_path_buf().join("demos");
     println!("Walking dir: {:?}", demos_path);
     for entry in WalkDir::new(&demos_path) {
@@ -284,93 +311,11 @@ async fn integration_tests() {
 
 #[tokio::test]
 async fn integration_test_net8() {
-    let port = "9001";
-    // Clean up old database to ensure fresh start
-    let _ = std::fs::remove_file(format!("test-{}.db", port));
-    // Start the server (will be automatically killed on drop)
-    let _server_guard = start_server(port);
-
-    // Wait for server to be ready
-    if let Err(e) = wait_for_server(port, 60).await {
-        panic!("Failed to start server: {}", e);
-    }
-
-    // Connect to the server
-    let mut client =
-        match ProviderServiceClient::connect(format!("{}:{}", "http://localhost", port)).await {
-            Ok(client) => client,
-            Err(e) => {
-                panic!(
-                    "Failed to connect to server: {} -- http://localhost:{}",
-                    e, port
-                );
-            }
-        };
-
-    let current_file = file!();
-    let file_path = absolute(PathBuf::from_str(current_file).unwrap()).unwrap();
-    let parent = file_path.parent().unwrap();
-    let base = parent.parent().unwrap();
-
-    // Initialize the provider with testdata/net8-sample (.NET 8 project)
-    let testdata_location = PathBuf::from(&base).join("testdata").join("net8-sample");
-    println!(
-        "Initializing provider with .NET 8 project: {:?}",
-        testdata_location
-    );
-
-    // Build provider-specific config
-    let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
-    let dotnet_install_script = PathBuf::from(&base)
-        .join("scripts")
-        .join("dotnet-install.sh");
-    let mut provider_config_fields = std::collections::BTreeMap::new();
-    provider_config_fields.insert(
-        "ilspy_cmd".to_string(),
-        Value {
-            kind: Some(StringValue(format!("{}/.dotnet/tools/ilspycmd", home_dir))),
-        },
-    );
-    provider_config_fields.insert(
-        "paket_cmd".to_string(),
-        Value {
-            kind: Some(StringValue(format!("{}/.dotnet/tools/paket", home_dir))),
-        },
-    );
-    provider_config_fields.insert(
-        "dotnet_install_cmd".to_string(),
-        Value {
-            kind: Some(StringValue(
-                dotnet_install_script.to_string_lossy().to_string(),
-            )),
-        },
-    );
-
-    let config = Config {
-        location: testdata_location.to_string_lossy().to_string(),
-        dependency_path: String::new(),
-        analysis_mode: "source-only".to_string(),
-        provider_specific_config: Some(Struct {
-            fields: provider_config_fields,
-        }),
-        proxy: None,
-        language_server_pipe: String::new(),
-        initialized: false,
-    };
-
-    // Call init
-    match client.init(config).await {
-        Ok(response) => {
-            let init_response = response.into_inner();
-            if !init_response.successful {
-                panic!("Init failed: {}", init_response.error);
-            }
-            println!("Successfully initialized .NET 8 provider");
-        }
-        Err(e) => {
-            panic!("Init request failed: {}", e);
-        }
-    }
+    let TestSetup {
+        mut client,
+        base_path: _,
+        _server_guard,
+    } = setup_test("9001", "net8-sample").await;
 
     // Test a query - search for Person class references (defined in our source code)
     let request = EvaluateRequest {
@@ -473,93 +418,11 @@ async fn integration_test_net8() {
 /// This tests the csharp-sample project which uses System.Web.Mvc - an external NuGet package.
 #[tokio::test]
 async fn integration_test_csharp_sample() {
-    let port = "9002";
-    // Clean up old database to ensure fresh start
-    let _ = std::fs::remove_file(format!("test-{}.db", port));
-    // Start the server (will be automatically killed on drop)
-    let _server_guard = start_server(port);
-
-    // Wait for server to be ready
-    if let Err(e) = wait_for_server(port, 60).await {
-        panic!("Failed to start server: {}", e);
-    }
-
-    // Connect to the server
-    let mut client =
-        match ProviderServiceClient::connect(format!("{}:{}", "http://localhost", port)).await {
-            Ok(client) => client,
-            Err(e) => {
-                panic!(
-                    "Failed to connect to server: {} -- http://localhost:{}",
-                    e, port
-                );
-            }
-        };
-
-    let current_file = file!();
-    let file_path = absolute(PathBuf::from_str(current_file).unwrap()).unwrap();
-    let parent = file_path.parent().unwrap();
-    let base = parent.parent().unwrap();
-
-    // Initialize the provider with csharp-sample (project with System.Web.Mvc references)
-    let testdata_location = PathBuf::from(&base).join("testdata").join("csharp-sample");
-    println!(
-        "Initializing provider with csharp-sample project: {:?}",
-        testdata_location
-    );
-
-    // Build provider-specific config
-    let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
-    let dotnet_install_script = PathBuf::from(&base)
-        .join("scripts")
-        .join("dotnet-install.sh");
-    let mut provider_config_fields = std::collections::BTreeMap::new();
-    provider_config_fields.insert(
-        "ilspy_cmd".to_string(),
-        Value {
-            kind: Some(StringValue(format!("{}/.dotnet/tools/ilspycmd", home_dir))),
-        },
-    );
-    provider_config_fields.insert(
-        "paket_cmd".to_string(),
-        Value {
-            kind: Some(StringValue(format!("{}/.dotnet/tools/paket", home_dir))),
-        },
-    );
-    provider_config_fields.insert(
-        "dotnet_install_cmd".to_string(),
-        Value {
-            kind: Some(StringValue(
-                dotnet_install_script.to_string_lossy().to_string(),
-            )),
-        },
-    );
-
-    let config = Config {
-        location: testdata_location.to_string_lossy().to_string(),
-        dependency_path: String::new(),
-        analysis_mode: "source-only".to_string(),
-        provider_specific_config: Some(Struct {
-            fields: provider_config_fields,
-        }),
-        proxy: None,
-        language_server_pipe: String::new(),
-        initialized: false,
-    };
-
-    // Call init
-    match client.init(config).await {
-        Ok(response) => {
-            let init_response = response.into_inner();
-            if !init_response.successful {
-                panic!("Init failed: {}", init_response.error);
-            }
-            println!("Successfully initialized csharp-sample provider");
-        }
-        Err(e) => {
-            panic!("Init request failed: {}", e);
-        }
-    }
+    let TestSetup {
+        mut client,
+        base_path: _,
+        _server_guard,
+    } = setup_test("9002", "csharp-sample").await;
 
     // Test: Query for System.Web.Mvc.* - should find the import statement
     // even when the namespace is not declared in user code or the SDK

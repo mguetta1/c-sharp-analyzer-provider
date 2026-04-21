@@ -18,6 +18,8 @@ paket-files/
 *.paket.props
 *.paket.references.cached
 *.paket.resolved
+*paket.dependencies
+*paket.references
 paket.lock
 
 # Test artifacts
