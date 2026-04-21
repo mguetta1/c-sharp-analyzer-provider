@@ -592,29 +592,34 @@ async fn integration_test_csharp_sample() {
             );
 
             // Verify the import statement is found in Program.cs
-            let import_incidents: Vec<_> = response
+            let import_incident = response
                 .incident_contexts
                 .iter()
-                .filter(|ic| ic.file_uri.contains("Program.cs"))
-                .collect();
+                .find(|ic| {
+                    let var = |key: &str| {
+                        ic.variables
+                            .as_ref()
+                            .and_then(|vars| vars.fields.get(key))
+                            .and_then(|value| match &value.kind {
+                                Some(StringValue(value)) => Some(value.as_str()),
+                                _ => None,
+                            })
+                    };
+
+                    ic.file_uri.contains("Program.cs")
+                        && ic.line_number == Some(2)
+                        && var("symbol") == Some("System.Web.Mvc")
+                        && var("syntax_type") == Some("import")
+                });
 
             assert!(
-                !import_incidents.is_empty(),
-                "Expected to find System.Web.Mvc import in Program.cs"
-            );
-
-            // Verify the line number is correct
-            let first_incident = import_incidents.first().unwrap();
-            assert_eq!(
-                first_incident.line_number,
-                Some(2),
-                "Expected System.Web.Mvc import at line 2 (0-indexed), got {:?}",
-                first_incident.line_number
+                import_incident.is_some(),
+                "Expected to find System.Web.Mvc import in Program.cs at line 2 (0-indexed)"
             );
 
             println!(
                 "Successfully found System.Web.Mvc import at line {} (0-indexed)",
-                first_incident.line_number.unwrap()
+                import_incident.unwrap().line_number.unwrap()
             );
         }
     }
