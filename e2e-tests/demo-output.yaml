@@ -63,7 +63,7 @@
           - Check for use of unsupported query patterns
           - Add .AsNoTracking() where appropriate for better performance
           - Review any custom DbSet implementations
-        codeSnip: "7 \n8 namespace NerdDinner.Models\n9 {\n10     public class UsersContext : DbContext\n11     {\n12         public UsersContext()\n13             : base(\"DefaultConnection\")\n14         {\n15         }\n16 \n"
+        codeSnip: "7 \n8 namespace NerdDinner.Models\n9 {\n10     public class UsersContext : DbContext\n11     {\n12         public UsersContext()\n13             : base(\"DefaultConnection\")\n14         {\n15         }\n16 \n17         public DbSet<UserProfile> UserProfiles { get; set; }\n18     }\n19 \n20     [Table(\"UserProfile\")]\n21     public class UserProfile\n22     {\n23         [Key]\n24         [DatabaseGeneratedAttribute(DatabaseGeneratedOption.Identity)]\n25         public int UserId { get; set; }\n26         public string UserName { get; set; }\n27     }\n"
         lineNumber: 17
         variables:
           file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Models/AccountModels.cs
@@ -709,7 +709,7 @@
           - Use Webpack, Gulp, or other build-time bundlers, or
           - Use ASP.NET Core bundling libraries like WebOptimizer
           - Update views to reference individual files or new bundle definitions
-        codeSnip: "0 \uFEFFusing System.Web;\n1 using System.Web.Optimization;\n2 \n3 namespace NerdDinner\n4 {\n5     public class BundleConfig\n6     {\n7         // For more information on Bundling, visit http://go.microsoft.com/fwlink/?LinkId=254725\n8         public static void RegisterBundles(BundleCollection bundles)\n9         {\n"
+        codeSnip: "0 \uFEFFusing System.Web;\n1 using System.Web.Optimization;\n2 \n3 namespace NerdDinner\n4 {\n5     public class BundleConfig\n6     {\n7         // For more information on Bundling, visit http://go.microsoft.com/fwlink/?LinkId=254725\n8         public static void RegisterBundles(BundleCollection bundles)\n9         {\n10             bundles.Add(new ScriptBundle(\"~/bundles/jquery\").Include(\n11                         \"~/Scripts/jquery-{version}.js\"));\n"
         lineNumber: 1
         variables:
           file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/App_Start/BundleConfig.cs
@@ -726,7 +726,7 @@
           - Use Webpack, Gulp, or other build-time bundlers, or
           - Use ASP.NET Core bundling libraries like WebOptimizer
           - Update views to reference individual files or new bundle definitions
-        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Reflection;\n4 using System.Web;\n5 using System.Web.Http;\n6 using System.Web.Mvc;\n7 using System.Web.Optimization;\n8 using System.Web.Routing;\n9 \n"
+        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Reflection;\n4 using System.Web;\n5 using System.Web.Http;\n6 using System.Web.Mvc;\n7 using System.Web.Optimization;\n8 using System.Web.Routing;\n9 \n10 namespace NerdDinner\n11 {\n12     // Note: For instructions on enabling IIS6 or IIS7 classic mode, \n13     // visit http://go.microsoft.com/?LinkId=9394801\n14 \n15     public class MvcApplication : System.Web.HttpApplication\n16     {\n17         protected void Application_Start()\n"
         lineNumber: 7
         variables:
           file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Global.asax.cs
@@ -752,7 +752,7 @@
           - Use app.UseRouting() and app.UseEndpoints() in the middleware pipeline
           - Consider using endpoint routing with MapControllerRoute
           - Update any custom route constraints
-        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Web;\n4 using System.Web.Mvc;\n5 using System.Web.Routing;\n6 \n7 namespace NerdDinner\n8 {\n9     public class RouteConfig\n"
+        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Web;\n4 using System.Web.Mvc;\n5 using System.Web.Routing;\n6 \n7 namespace NerdDinner\n8 {\n9     public class RouteConfig\n10     {\n11         public static void RegisterRoutes(RouteCollection routes)\n12         {\n13             routes.IgnoreRoute(\"{resource}.axd/{*pathInfo}\");\n14 \n15             routes.MapRoute(\n"
         lineNumber: 5
         variables:
           file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/App_Start/RouteConfig.cs
@@ -767,7 +767,7 @@
           - Use app.UseRouting() and app.UseEndpoints() in the middleware pipeline
           - Consider using endpoint routing with MapControllerRoute
           - Update any custom route constraints
-        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Reflection;\n4 using System.Web;\n5 using System.Web.Http;\n6 using System.Web.Mvc;\n7 using System.Web.Optimization;\n8 using System.Web.Routing;\n9 \n"
+        codeSnip: "0 \uFEFFusing System;\n1 using System.Collections.Generic;\n2 using System.Linq;\n3 using System.Reflection;\n4 using System.Web;\n5 using System.Web.Http;\n6 using System.Web.Mvc;\n7 using System.Web.Optimization;\n8 using System.Web.Routing;\n9 \n10 namespace NerdDinner\n11 {\n12     // Note: For instructions on enabling IIS6 or IIS7 classic mode, \n13     // visit http://go.microsoft.com/?LinkId=9394801\n14 \n15     public class MvcApplication : System.Web.HttpApplication\n16     {\n17         protected void Application_Start()\n18         {\n"
         lineNumber: 8
         variables:
           file: file:///analyzer-lsp/examples/nerd-dinner/mvc4/NerdDinner/Global.asax.cs
